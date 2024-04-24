@@ -118,7 +118,7 @@ def _fit_metric(df_for_fit:pd.DataFrame, lon:float, lat:float, metric:str) -> fl
     y = df_for_fit[metric].values
 
     # Do the actual fit
-    popt, _ = scipy.optimize.curve_fit(f, x, y)
+    popt, _ = scipy.optimize.curve_fit(f, x, y, maxfev=15000)
 
     # Return the fitted results
     return f(np.array([[lon, lat]]), popt[0], popt[1], popt[2])
