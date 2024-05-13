@@ -74,57 +74,57 @@ def _get_station_year_weather(stn:int, lower_year:int, upper_year:int, metrics:l
     for metric in ['T', 'FH', 'DR']:
         if metric in metrics:
             df[metric] = df[metric] / 10 # Temperature in decimal
-    
+
     # Fix non-relevant wind directions
     if 'DD' in metrics:
         df.loc[df['DD'] < 0.01, 'DD'] = np.nan
         df.loc[df['DD'] > 360, 'DD'] = np.nan
-    
+
     # Fix non-relevant rainfall
     if 'RH' in metrics:
         df.loc[df['RH'] < 0, 'RH'] = 0
-   
+
     return df
 
 def _get_station_weather(stn:int, metrics:list) -> pd.DataFrame:
     """Download multiple timeperiods for one station"""
-    
+
     df_2010s = _get_station_year_weather(stn, 2011, 2020, metrics)
     df_2020s = _get_station_year_weather(stn, 2021, 2030, metrics)
-    
+
     return pd.concat([df_2010s, df_2020s])
 
 def _get_all_station_weather(df_stations:pd.DataFrame, metrics) -> pd.DataFrame:
     """Download multiple timeperiods for multiple stations"""
-    
-    df = pd.DataFrame()    
+
+    df = pd.DataFrame()
     for stn in df_stations['STN'].unique():
 
         df_station = _get_station_weather(stn, metrics)
         df = pd.concat([df, df_station])
-        
+
     return df
 
-def _fit_metric(df_for_fit:pd.DataFrame, lon:float, lat:float, metric:str) -> float:
-    """Localize a metric for a single timestamp. 
+def _fit_metric(df_for_fit: pd.DataFrame, lon: float, lat: float, metric: str) -> float:
+    """Localize a metric for a single timestamp.
     Requires a set of station in df_for_fit and a target location (lon, lat)"""
-    
+
     # Model for a linear plane
     def f(X, a, b, c):
-        return a*X[:,0] + b*X[:, 1] + c
+        return a * X[:, 0] + b * X[:, 1] + c
 
     # Select the X & Y for the temperature
     x = df_for_fit[['LON', 'LAT']].values
     y = df_for_fit[metric].values
 
-    # Do the actual fit
-    popt, _ = scipy.optimize.curve_fit(f, x, y, maxfev=15000)
+    # Do the actual fit without providing initial guess values
+    popt, _ = scipy.optimize.curve_fit(f, x, y, p0=None)
 
     # Return the fitted results
-    return f(np.array([[lon, lat]]), popt[0], popt[1], popt[2])
+    return f(np.array([[lon, lat]]), *popt)
 
 def _calculate_locate_weather(df:pd.DataFrame, df_closest_stations:pd.DataFrame, lon:float, lat:float, metrics:list, N:int) -> pd.DataFrame:
-    
+
     # Establish what each unique combination is
     datetime_combinations = df[['YYYYMMDD', 'HH']].drop_duplicates()
     datetime_combinations.index = range(datetime_combinations.shape[0])
@@ -141,34 +141,34 @@ def _calculate_locate_weather(df:pd.DataFrame, df_closest_stations:pd.DataFrame,
         df_subset = pd.merge(df.loc[m], df_closest_stations, on='STN')
 
         # Create a results row
-        df_result_row = pd.DataFrame({'YYYYMMDD':[datetime_item['YYYYMMDD']], 
+        df_result_row = pd.DataFrame({'YYYYMMDD':[datetime_item['YYYYMMDD']],
                                       'HH':[datetime_item['HH']],
-                                      'datetime': datetime(int(str(datetime_item['YYYYMMDD'])[:4]), 
-                                                              int(str(datetime_item['YYYYMMDD'])[4:6]), 
+                                      'datetime': datetime(int(str(datetime_item['YYYYMMDD'])[:4]),
+                                                              int(str(datetime_item['YYYYMMDD'])[4:6]),
                                                               int(str(datetime_item['YYYYMMDD'])[6:8]),
                                                               datetime_item['HH']-1,
                                                               0,
                                                               0
                                       )}
                                     )
-        
+
         # Do a 2D linear regression for each metric we are interested in
-        for metric in metrics:        
+        for metric in metrics:
             if df_subset[metric].dropna().shape[0] > (N-1):
                 df_result_row[metric] = _fit_metric(df_subset.loc[~df_subset[metric].isna()].head(N), lon, lat, metric)
-     
+
         df_result = pd.concat([df_result, df_result_row])
 
     # Final fixes
     if 'N' in df_result.columns:
-        df_result.loc[df_result['N'] < 0, 'N'] = 0        
-        df_result.loc[df_result['N'] > 9, 'N'] = 9      
+        df_result.loc[df_result['N'] < 0, 'N'] = 0
+        df_result.loc[df_result['N'] > 9, 'N'] = 9
     return df_result
 
-def get_local_weather(starttime:datetime, endtime:datetime, lat:float, lon:float, 
+def get_local_weather(starttime:datetime, endtime:datetime, lat:float, lon:float,
                       N_stations:int=3, metrics:list = ['T', 'FH', 'DD', 'Q', 'DR', 'RH', 'U', 'N']) -> pd.DataFrame:
     """Get the localized hourly weather from the dutch KNMI website for a particular timeframe.
-       
+
        Currently supports times starting as of 2010
 
        Timestamp represents the start of a particular hour. E.g. 14:00 represents 14:00-15:00
@@ -186,19 +186,19 @@ def get_local_weather(starttime:datetime, endtime:datetime, lat:float, lon:float
         starttime = pytz.timezone('Europe/Amsterdam').localize(starttime)
     if (endtime.tzinfo is None):
         endtime = pytz.timezone('Europe/Amsterdam').localize(endtime)
-                                         
+
     # Get the nearest stations in the dataset
     df_closest_stations = _get_closest_stations(lon, lat, N=(N_stations*2))
-    
+
     # Download the historic data for those stations
     df_combined = _get_all_station_weather(df_closest_stations, metrics)
-    
+
     # Filter the dataset based on the supplied ranges
     df_combined = df_combined.loc[(df_combined['YYYYMMDD'] >= int(starttime.astimezone(pytz.timezone('UTC')).strftime('%Y%m%d'))) & \
                                     (df_combined['YYYYMMDD'] <= int(endtime.astimezone(pytz.timezone('UTC')).strftime('%Y%m%d')))]
-    
+
     # Required to ensure all columns exist (when no data is available, these would drop)
-    df_template = pd.DataFrame(columns=metrics) 
+    df_template = pd.DataFrame(columns=metrics)
 
     # Localize the data
     df_local_weather = _calculate_locate_weather(df_combined, df_closest_stations, lon, lat, metrics=metrics, N=N_stations).set_index('datetime')
