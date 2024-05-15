@@ -117,8 +117,10 @@ def _fit_metric(df_for_fit: pd.DataFrame, lon: float, lat: float, metric: str) -
     x = df_for_fit[['LON', 'LAT']].values
     y = df_for_fit[metric].values
 
+    bounds = ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf])
+
     # Do the actual fit without providing initial guess values
-    popt, _ = scipy.optimize.curve_fit(f, x, y, p0=None)
+    popt, _ = scipy.optimize.curve_fit(f, x, y, p0=None, bounds=bounds)
 
     # Return the fitted results
     return f(np.array([[lon, lat]]), *popt)
@@ -206,3 +208,4 @@ def get_local_weather(starttime:datetime, endtime:datetime, lat:float, lon:float
 
     # return as timezone aware dataframe
     return df_result[starttime:endtime]
+#%%

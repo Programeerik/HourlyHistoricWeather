@@ -3,9 +3,9 @@ from setuptools import setup
 setup(name='historicdutchweather',
         version='1.2.1',
         description='Download the hourly historic weather from the dutch weather agency KNMI and localize the data to a particular lon/lat',
-        url='https://github.com/stephanpcpeters/HourlyHistoricWeather',
+        url='https://github.com/Programeerik/HourlyHistoricWeather',
         project_urls={
-            "Bug Tracker": "https://github.com/stephanpcpeters/HourlyHistoricWeather/issues",
+            "Bug Tracker": "https://github.com/Programeerik/HourlyHistoricWeather/issues",
         },
         author='Stephan Peters',
         author_email='s.p.c.peters@gmail.com',
@@ -24,3 +24,4 @@ setup(name='historicdutchweather',
         ],
         python_requires=">=3.6",
         zip_safe=False)
+#%%

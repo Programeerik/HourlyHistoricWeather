@@ -9,3 +9,4 @@
 from .main import get_local_weather, column_descriptions
 
 __all__ = ['get_local_weather', 'column_descriptions']
+#%%
