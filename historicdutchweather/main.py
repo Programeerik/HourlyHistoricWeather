@@ -120,7 +120,7 @@ def _fit_metric(df_for_fit: pd.DataFrame, lon: float, lat: float, metric: str) -
     bounds = ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf])
 
     # Do the actual fit without providing initial guess values
-    popt, _ = scipy.optimize.curve_fit(f, x, y, p0=None, bounds=bounds)
+    popt, _ = scipy.optimize.curve_fit(f, x, y, p0=None, bounds=bounds, maxfev=10000)
 
     # Return the fitted results
     return f(np.array([[lon, lat]]), *popt)
